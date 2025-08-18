@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>投稿与投票 | 星光对决</title>
+<style>
+*{box-sizing:border-box} body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:#f6f7fb;margin:0;color:#333}
+.container{max-width:980px;margin:24px auto;padding:0 16px}
+.header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:18px 16px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+.header h1{margin:0;font-size:1.6em}
+.breadcrumb{margin-top:8px;font-size:12px;opacity:.9}
+.panel{background:#fff;border-radius:14px;padding:16px;margin-top:16px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.panel h2{margin:0 0 10px 0;font-size:1.2em}
+.btn{display:inline-block;background:#667eea;color:#fff;text-decoration:none;border:none;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
+.btn.secondary{background:#eef;color:#334;border:1px solid #ccd}
+.item{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #f0f0f0}
+.item img{width:70px;height:94px;object-fit:cover;border-radius:8px}
+.meta{font-size:12px;color:#666}
+.badge{padding:2px 8px;background:#eef;border-radius:999px;font-size:12px}
+.rule{font-size:13px;line-height:1.6;color:#444}
+.muted{color:#888}
+input[type="file"],input[type="text"]{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px}
+.hint{font-size:12px;color:#999;margin-top:6px}
+@media (max-width:768px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1 id="pageTitle">投稿与投票</h1>
+    <div class="breadcrumb"><a href="index.html" style="color:#fff;text-decoration:underline;">← 返回首页</a></div>
+  </div>
+
+  <div class="panel">
+    <h2>投票规则</h2>
+    <div class="rule">
+      • 每个账号 <b>每 2 小时</b>可投 <b>1 票</b>（冷却期间不能再次投）<br>
+      • 在本页多个候选中，<b>一次投票只能选一个</b><br>
+      • 投稿票数 <b>> 10</b> 自动替换首页默认展示（图片或简介）<br>
+      • 简介<b>限中文 10 字以内</b>；内容需健康合规
+    </div>
+    <div id="cooldownTip" class="hint"></div>
+  </div>
+
+  <div class="panel">
+    <h2 id="uploadTitle">上传投稿</h2>
+    <div id="uploadBox"></div>
+  </div>
+
+  <div class="panel">
+    <h2>已收到的投稿</h2>
+    <div id="listBox"></div>
+  </div>
+</div>
+
+<script>
+/* ===== 与 index.html 对齐的存储键（v10） ===== */
+const STORAGE_KEY='stargame_v10';
+const LAST_VOTE_AT_KEY='stargame_last_vote_at';
+const VOTE_COOLDOWN_MS=2*60*60*1000;
+const PROMOTE_THRESHOLD=10;
+
+const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+const now = () => Date.now();
+const posterOf = name => `https://placehold.co/320x440/png?text=${encodeURIComponent(name||'')}`;
+
+function loadState(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw);}catch(e){} return null; }
+function saveState(s){ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
+function canVote(){ const t=+localStorage.getItem(LAST_VOTE_AT_KEY)||0; return now()-t>=VOTE_COOLDOWN_MS; }
+function markVoted(){ localStorage.setItem(LAST_VOTE_AT_KEY, String(now())); }
+function validateChineseQuote(s){ const clean=(s||'').replace(/\s+/g,''); const len=[...clean].length; return {ok:len>0&&len<=10,clean,len}; }
+function fileToDataURL(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
+
+/* ===== URL 参数解析 =====
+   entity=star|cp
+   - star: side=left|right, type=photo|quote
+   - cp:   cpId=cp_xxx,   type=photo|quote
+*/
+const params=new URLSearchParams(location.search);
+const entity=(params.get('entity')||'star').toLowerCase();
+const type=(params.get('type')||'photo').toLowerCase();
+
+let state = loadState();
+if(!state){
+  // 兜底：最小可运行状态，便于用户直接访问本页测试
+  state = {
+    left:{name:'易烊千玺',defaultPhotoUrl:posterOf('易烊千玺'),defaultQuote:'出手即巅峰',currentPhotoUrl:posterOf('易烊千玺'),currentQuote:'出手即巅峰',candidates:[]},
+    right:{name:'王一博',defaultPhotoUrl:posterOf('王一博'),defaultQuote:'从不言弃',currentPhotoUrl:posterOf('王一博'),currentQuote:'从不言弃',candidates:[]},
+    cpList:[{id:'cp_tmp',name:'临时CP',defaultPhotoUrl:posterOf('临时CP'),currentPhotoUrl:posterOf('临时CP'),defaultQuote:'天作之合',currentQuote:'天作之合',candidates:[]}]
+  };
+  saveState(state);
+}
+
+/* ===== 选择主体（明星 or CP） ===== */
+let hostObj=null;
+let titleName='';
+
+if(entity==='star'){
+  const side=params.get('side')==='right' ? 'right' : 'left';
+  hostObj = state[side];
+  if(!hostObj){ // 冗余兜底
+    state[side]={name: side==='left'?'左侧明星':'右侧明星', defaultPhotoUrl:posterOf('明星'), currentPhotoUrl:posterOf('明星'), defaultQuote:'个性十足', currentQuote:'个性十足', candidates:[]};
+    hostObj=state[side]; saveState(state);
+  }
+  titleName = hostObj.name || (side==='left'?'左侧明星':'右侧明星');
+}else{
+  const cpId=params.get('cpId');
+  if(Array.isArray(state.cpList)){
+    hostObj = state.cpList.find(c=>String(c.id)===String(cpId)) || state.cpList[0];
+  }
+  if(!hostObj){
+    // 若没有 cpList 或找不到，构造一个最小 CP 条目
+    hostObj = {id: cpId||'cp_tmp', name:'临时CP', defaultPhotoUrl:posterOf('临时CP'), currentPhotoUrl:posterOf('临时CP'), defaultQuote:'天作之合', currentQuote:'天作之合', candidates:[]};
+    state.cpList = state.cpList || [];
+    state.cpList.push(hostObj); saveState(state);
+  }
+  titleName = hostObj.name || 'CP';
+}
+
+/* ===== 页面抬头 ===== */
+document.getElementById('pageTitle').textContent = `${type==='photo'?'图片投稿':'简介投稿'} · ${titleName}`;
+document.getElementById('uploadTitle').textContent = `上传${type==='photo'?'图片':'简介'}（${titleName}）`;
+
+/* ===== 冷却提示 ===== */
+function renderCooldownTip(){
+  const el=document.getElementById('cooldownTip');
+  if(canVote()){ el.textContent='你现在可以投票 ✅'; }
+  else{
+    const left=+localStorage.getItem(LAST_VOTE_AT_KEY)||0;
+    const remain=VOTE_COOLDOWN_MS-(now()-left);
+    const m=Math.max(0,Math.ceil(remain/60000));
+    el.textContent=`冷却中：约 ${m} 分钟后可再次投票`;
+  }
+}
+renderCooldownTip();
+
+/* ===== 上传区 ===== */
+function renderUploadBox(){
+  const box=document.getElementById('uploadBox'); box.innerHTML='';
+  if(type==='photo'){
+    const input=document.createElement('input'); input.type='file'; input.accept='image/*';
+    const hint=document.createElement('div'); hint.className='hint'; hint.textContent='选择图片后作为新的候选项提交。';
+    const btn=document.createElement('button'); btn.className='btn'; btn.textContent='提交图片';
+    btn.onclick=async()=>{
+      if(!input.files || !input.files[0]){ alert('请先选择图片'); return; }
+      const dataUrl=await fileToDataURL(input.files[0]);
+      const cand={id:uid(),type:'photo',data:dataUrl,votes:0,createdAt:now(),entity};
+      // 记录定位字段：star 用 side，cp 用 cpId
+      if(entity==='star'){ cand.side=(state.left===hostObj?'left':'right'); }
+      else{ cand.cpId=hostObj.id; }
+      hostObj.candidates = hostObj.candidates || [];
+      hostObj.candidates.unshift(cand);
+      saveState(state); renderList();
+      alert('上传成功！记得给喜欢的投稿投票～');
+    };
+    box.appendChild(input); box.appendChild(hint); box.appendChild(document.createElement('br')); box.appendChild(document.createElement('br')); box.appendChild(btn);
+  }else{
+    const input=document.createElement('input'); input.type='text'; input.placeholder='请输入中文简介（≤10字）';
+    const hint=document.createElement('div'); hint.className='hint'; hint.textContent='例如：出手即巅峰';
+    const btn=document.createElement('button'); btn.className='btn'; btn.textContent='提交简介';
+    btn.onclick=()=>{
+      const {ok,clean,len}=validateChineseQuote(input.value);
+      if(!ok){ alert(`简介长度 ${len}，需在 1–10 个中文字符内`); return; }
+      const cand={id:uid(),type:'quote',data:clean,votes:0,createdAt:now(),entity};
+      if(entity==='star'){ cand.side=(state.left===hostObj?'left':'right'); }
+      else{ cand.cpId=hostObj.id; }
+      hostObj.candidates = hostObj.candidates || [];
+      hostObj.candidates.unshift(cand);
+      saveState(state); renderList(); input.value='';
+      alert('上传成功！记得给喜欢的投稿投票～');
+    };
+    box.appendChild(input); box.appendChild(hint); box.appendChild(document.createElement('br')); box.appendChild(document.createElement('br')); box.appendChild(btn);
+  }
+}
+renderUploadBox();
+
+/* ===== 投稿列表 + 投票（2 小时冷却 / 一次只能投一个） ===== */
+function renderList(){
+  const box=document.getElementById('listBox'); box.innerHTML='';
+  const list=(hostObj.candidates||[]).filter(c=>c.type===type);
+  if(!list.length){ box.innerHTML='<div class="muted">暂无投稿，快成为第一个吧～</div>'; return; }
+
+  list.sort((a,b)=>b.votes-a.votes);
+  list.forEach(c=>{
+    const row=document.createElement('div'); row.className='item';
+
+    if(c.type==='photo'){
+      const img=document.createElement('img'); img.src=c.data; row.appendChild(img);
+    }else{
+      const ph=document.createElement('div'); ph.className='badge'; ph.textContent='简介'; row.appendChild(ph);
+    }
+
+    const col=document.createElement('div'); col.style.flex='1';
+    col.innerHTML = c.type==='quote'
+      ? `<div style="font-weight:700;color:#444;">“${c.data}”</div>`
+      : `<div class="meta">图片投稿</div>`;
+    const pv=document.createElement('div'); pv.className='meta'; pv.textContent=`票数：${c.votes}`; col.appendChild(pv);
+    row.appendChild(col);
+
+    const btn=document.createElement('button'); btn.className='btn'; btn.textContent='投一票';
+    btn.onclick=()=>{
+      if(!canVote()){ alert('冷却中：每账号每 2 小时可投 1 票'); return; }
+      c.votes+=1; markVoted(); saveState(state); renderList(); renderCooldownTip();
+      if(c.votes > PROMOTE_THRESHOLD){
+        if(c.type==='photo'){ hostObj.currentPhotoUrl=c.data; }
+        else{ hostObj.currentQuote=c.data; }
+        saveState(state);
+        alert('🎉 票数 > 10，已替换首页默认展示！');
+      }
+    };
+    row.appendChild(btn);
+
+    box.appendChild(row);
+  });
+}
+renderList();
+</script>
+</body>
+</html>
