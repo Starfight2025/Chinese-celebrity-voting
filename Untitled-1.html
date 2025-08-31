@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>星光对决 - 性别/年龄/领域分区</title>
+<style>
+/* —— 样式 —— */
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;color:#333;overflow-x:hidden}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.header{text-align:center;margin-bottom:40px;color:white;animation:fadeInDown 1s ease-out}
+.header h1{font-size:3.2em;margin-bottom:12px;background:linear-gradient(45deg,#fff,#f0f0f0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-shadow:3px 3px 6px rgba(0,0,0,.4)}
+.header p{font-size:1.1em;opacity:.95;text-shadow:1px 1px 3px rgba(0,0,0,.3)}
+.nav{display:flex;justify-content:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;animation:fadeInUp 1s ease-out .3s both}
+.nav-btn{background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.3);color:white;padding:12px 22px;border-radius:30px;cursor:pointer;transition:all .4s cubic-bezier(.175,.885,.32,1.275);backdrop-filter:blur(15px);font-size:1em;font-weight:600;position:relative;overflow:hidden}
+.nav-btn:hover,.nav-btn.active{background:rgba(255,255,255,.25);transform:translateY(-3px) scale(1.05);box-shadow:0 12px 35px rgba(0,0,0,.3);border-color:rgba(255,255,255,.5)}
+.filters{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:24px;animation:slideInUp .8s ease-out .5s both}
+.filter-card{background:rgba(255,255,255,.95);border-radius:14px;padding:12px 16px;box-shadow:0 12px 35px rgba(0,0,0,.15);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.2)}
+.filter-card label{font-weight:700;margin-right:8px;color:#333}
+.filter-card select{padding:6px 10px;border-radius:10px;border:2px solid #ddd;font-size:14px;background:white;cursor:pointer}
+.hidden{display:none}
+.loading{text-align:center;padding:40px;color:white;font-size:1.2em}
+.comparison-section,.leaderboard,.cp-section,.battle-section{background:rgba(255,255,255,.95);border-radius:20px;padding:28px;margin-bottom:22px;box-shadow:0 25px 80px rgba(0,0,0,.15);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.2)}
+.comparison-section h2,.leaderboard h2,.cp-section h2,.battle-section h2{text-align:center;font-size:2.1em;margin-bottom:20px;background:linear-gradient(45deg,#667eea,#764ba2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.comparison-container{display:flex;justify-content:space-between;align-items:center;gap:24px;max-width:980px;margin:0 auto}
+.star-card{flex:1;text-align:center;padding:22px 18px;border-radius:18px;background:linear-gradient(145deg,#f8f9fa,#fff);box-shadow:0 15px 40px rgba(0,0,0,.1);position:relative;border:2px solid transparent}
+.champion-card{border-color:#ffd700;box-shadow:0 15px 40px rgba(255,215,0,.3)}
+.challenger-card{border-color:#ff6b6b;box-shadow:0 15px 40px rgba(255,107,107,.3)}
+.star-photo{width:160px;height:220px;border-radius:15px;margin:0 auto 12px;background-size:cover;background-position:center;background-repeat:no-repeat;position:relative}
+.photo-upload-overlay{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.7);color:white;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.star-name{font-size:1.3em;font-weight:bold;margin-bottom:6px}
+.star-quote{color:#667eea;font-style:italic;font-size:.95em;margin-bottom:8px;min-height:20px;cursor:pointer}
+.star-info{font-size:.85em;color:#666;margin-bottom:6px}
+.wins-count{color:#667eea;font-weight:600;margin-bottom:10px;font-size:.92em}
+.vote-btn{background:linear-gradient(45deg,#667eea,#764ba2);color:white;border:none;padding:12px 26px;border-radius:26px;cursor:pointer;font-size:1em;font-weight:bold}
+.vs-divider{font-size:2.2em;font-weight:bold;background:linear-gradient(45deg,#ff6b6b,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.badge{font-size:12px;padding:2px 8px;border-radius:999px;background:#eef}
+.post-actions{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.post-link-btn{display:inline-block;padding:8px 12px;border-radius:10px;border:1px solid #667eea;color:#667eea;text-decoration:none;font-size:12px;background:#fff}
+.post-link-btn:hover{background:#eef}
+.battle-news{background:linear-gradient(45deg,#f8f9fa,#e9ecef);border-radius:12px;padding:18px;margin-bottom:14px;border-left:5px solid #667eea}
+.ranks-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:980px;margin:0 auto}
+.rank-card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.06)}
+.rank-card h3{margin:0 0 8px 0;font-size:16px;color:#555}
+.rank-card ol{margin:0;padding-left:18px}
+.rank-card li{margin:4px 0}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInUp{from{opacity:0;transform:translateY(50px)}to{opacity:1;transform:translateY(0)}}
+@media (max-width:768px){.container{padding:15px}.header h1{font-size:2.2em}.comparison-container{flex-direction:column;gap:16px}.vs-divider{transform:rotate(90deg);margin:12px 0}.ranks-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🔥 星光对决 🔥</h1>
+    <p>擂台无限对打（Elo 计分）；投稿跳转投票页；榜单自动 Top10。</p>
+  </div>
+
+  <div id="loadingIndicator" class="loading">正在加载明星数据...</div>
+
+  <div id="mainContent" class="hidden">
+    <div class="nav">
+      <button class="nav-btn active" onclick="showSection(event,'arena')">🏟️ 明星擂台</button>
+      <button class="nav-btn" onclick="showSection(event,'cp')">💕 CP大作战</button>
+      <button class="nav-btn" onclick="showSection(event,'ranking')">👑 王者榜单</button>
+      <button class="nav-btn" onclick="showSection(event,'battle')">💥 战况播报</button>
+    </div>
+
+    <!-- 过滤器仅作用于明星擂台与明星榜单 -->
+    <div class="filters">
+      <div class="filter-card"><label>性别：</label>
+        <select id="genderFilter" onchange="applyFilters()"><option value="all">全部</option></select>
+      </div>
+      <div class="filter-card"><label>年龄段：</label>
+        <select id="ageFilter" onchange="applyFilters()"><option value="all">全部</option></select>
+      </div>
+      <div class="filter-card"><label>领域：</label>
+        <select id="categoryFilter" onchange="applyFilters()"><option value="all">全部</option></select>
+      </div>
+    </div>
+
+    <!-- 明星擂台 -->
+    <div id="arenaSection" class="comparison-section">
+      <h2>🏟️ 明星擂台</h2>
+      <div class="comparison-container">
+        <div class="star-card champion-card" id="leftCard">
+          <div class="star-photo" id="arenaLeftPhoto">
+            <button class="photo-upload-overlay"
+                    onclick="event.stopPropagation(); location.href='submissions.html?entity=star&side=left&type=photo'"
+                    title="上传照片">📷</button>
+          </div>
+          <div class="star-name" id="arenaLeftName"></div>
+          <div class="star-info" id="arenaLeftInfo"></div>
+          <div class="star-quote" id="arenaLeftQuote" title="点击编辑个性简介">点击添加个性简介...</div>
+          <div class="wins-count" id="leftWins">连胜: 0场</div>
+          <button class="vote-btn" id="leftVoteBtn">左侧胜</button>
+          <div class="post-actions">
+            <a id="leftPhotoPost" class="post-link-btn" href="#">🖼 图片投稿</a>
+            <a id="leftQuotePost" class="post-link-btn" href="#">✍️ 简介投稿</a>
+          </div>
+        </div>
+        <div class="vs-divider">⚡VS⚡</div>
+        <div class="star-card challenger-card" id="rightCard">
+          <div class="star-photo" id="arenaRightPhoto">
+            <button class="photo-upload-overlay"
+                    onclick="event.stopPropagation(); location.href='submissions.html?entity=star&side=right&type=photo'"
+                    title="上传照片">📷</button>
+          </div>
+          <div class="star-name" id="arenaRightName"></div>
+          <div class="star-info" id="arenaRightInfo"></div>
+          <div class="star-quote" id="arenaRightQuote" title="点击编辑个性简介">点击添加个性简介...</div>
+          <div class="wins-count" id="rightWins">连胜: 0场</div>
+          <button class="vote-btn" id="rightVoteBtn">右侧胜</button>
+          <div class="post-actions">
+            <a id="rightPhotoPost" class="post-link-btn" href="#">🖼 图片投稿</a>
+            <a id="rightQuotePost" class="post-link-btn" href="#">✍️ 简介投稿</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CP 大作战（擂台 + 投稿按钮） -->
+    <div id="cpSection" class="cp-section hidden">
+      <h2>💕 CP大作战（擂台）</h2>
+      <div class="comparison-container">
+        <div class="star-card champion-card" id="cpLeftCard">
+          <div class="star-photo" id="cpLeftPhoto"></div>
+          <div class="star-name" id="cpLeftName"></div>
+          <div class="star-quote" id="cpLeftQuote">—</div>
+          <div class="wins-count" id="cpLeftWins">连胜: 0场</div>
+          <button class="vote-btn" id="cpLeftVoteBtn">左侧胜</button>
+          <div class="post-actions">
+            <a id="cpLeftPhotoPost" class="post-link-btn" href="#">🖼 图片投稿</a>
+            <a id="cpLeftQuotePost" class="post-link-btn" href="#">✍️ 简介投稿</a>
+          </div>
+        </div>
+        <div class="vs-divider">⚡VS⚡</div>
+        <div class="star-card challenger-card" id="cpRightCard">
+          <div class="star-photo" id="cpRightPhoto"></div>
+          <div class="star-name" id="cpRightName"></div>
+          <div class="star-quote" id="cpRightQuote">—</div>
+          <div class="wins-count" id="cpRightWins">连胜: 0场</div>
+          <button class="vote-btn" id="cpRightVoteBtn">右侧胜</button>
+          <div class="post-actions">
+            <a id="cpRightPhotoPost" class="post-link-btn" href="#">🖼 图片投稿</a>
+            <a id="cpRightQuotePost" class="post-link-btn" href="#">✍️ 简介投稿</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 榜单 -->
+    <div id="rankingSection" class="leaderboard hidden">
+      <h2>👑 王者榜单</h2>
+      <div id="rankingWrap" class="ranks-grid"></div>
+    </div>
+
+    <!-- 战况播报 -->
+    <div id="battleSection" class="battle-section hidden">
+      <h2>💥 战况播报</h2>
+      <div class="battle-news" id="battleFeed">还没有战况，快开始对打！</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========== 工具与状态 ========== */
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2)+Date.now().toString(36);
+const now = () => Date.now();
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+const posterOf = name => `https://placehold.co/320x440/png?text=${encodeURIComponent(name||'')}`;
+const STORAGE_KEY='stargame_v11';
+
+const K_FACTOR=32;
+
+/* 数据加载 */
+const files = [
+  "data/stars_part_1_zh_normalized.json",
+  "data/stars_part_2_zh_normalized.json", 
+  "data/stars_part_3_zh_normalized.json",
+  "data/stars_part_4_zh_normalized.json",
+  "data/stars_part_5_zh_normalized.json"
+];
+
+let allStars = [];
+let starsRaw = [];
+
+/* CP 数据（保持原有） */
+const popularCPs = [
+  {id:'cp_1',name:"肖战 × 王一博",star1:"肖战",star2:"王一博",source:"《陈情令》",score:15880,type:"耽美CP",wins:0},
+  {id:'cp_2',name:"杨紫 × 肖战",star1:"肖战",star2:"杨紫",source:"《余生请多指教》",score:12450,type:"荧幕CP",wins:0},
+  {id:'cp_3',name:"赵丽颖 × 王一博",star1:"王一博",star2:"赵丽颖",source:"《有翡》",score:11200,type:"荧幕CP",wins:0},
+  {id:'cp_4',name:"迪丽热巴 × 杨洋",star1:"杨洋",star2:"迪丽热巴",source:"《你是我的荣耀》",score:10800,type:"荧幕CP",wins:0},
+  {id:'cp_5',name:"古力娜扎 × 易烊千玺",star1:"易烊千玺",star2:"古力娜扎",source:"《长安十二时辰》",score:9900,type:"荧幕CP",wins:0},
+  {id:'cp_6',name:"刘亦菲 × 朱一龙",star1:"朱一龙",star2:"刘亦菲",source:"《梦华录》",score:9600,type:"荧幕CP",wins:0},
+  {id:'cp_7',name:"关晓彤 × 鹿晗",star1:"鹿晗",star2:"关晓彤",source:"现实情侣",score:8500,type:"真实CP",wins:0},
+  {id:'cp_8',name:"杨幂 × 李现",star1:"李现",star2:"杨幂",source:"联想",score:8200,type:"梦幻CP",wins:0},
+  {id:'cp_9',name:"张子枫 × 易烊千玺",star1:"易烊千玺",star2:"张子枫",source:"《少年的你》",score:7800,type:"荧幕CP",wins:0},
+  {id:'cp_10',name:"华晨宇 × 邓紫棋",star1:"华晨宇",star2:"邓紫棋",source:"音乐合作",score:7200,type:"音乐CP",wins:0},
+];
+
+/* 年龄段工具 */
+function getAgeGroup(birthdayStr) {
+  if (!birthdayStr || birthdayStr === "不详" || birthdayStr === "未知") return "未知";
+  const year = parseInt(birthdayStr.slice(0, 4));
+  if (isNaN(year)) return "未知";
+  
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - year;
+  
+  if (age <= 24) return "00后";
+  if (age <= 34) return "90后";
+  if (age <= 44) return "80后";
+  if (age <= 54) return "70后";
+  return "60后+";
+}
+
+function ageGroup(age) {
+  if (age <= 24) return "00后";
+  if (age <= 34) return "90后";
+  if (age <= 44) return "80后";
+  if (age <= 54) return "70后";
+  return "60后+";
+}
+
+/* 数据转换函数 */
+function convertStarData(jsonStar) {
+  const birthYear = jsonStar["出生日期"] ? parseInt(jsonStar["出生日期"].slice(0, 4)) : null;
+  const age = birthYear ? new Date().getFullYear() - birthYear : 25;
+  
+  // 领域映射
+  const domains = jsonStar["领域"] || [];
+  let category = "actor"; // 默认
+  if (domains.includes("音樂人")) category = "singer";
+  else if (domains.includes("主持人")) category = "variety";
+  
+  // 性别映射
+  const gender = jsonStar["性別"] === "男" ? "male" : jsonStar["性別"] === "女" ? "female" : "male";
+  
+  return {
+    name: jsonStar["姓名"],
+    gender: gender,
+    age: age,
+    category: category,
+    score: 1200,
+    wins: 0,
+    birthDate: jsonStar["出生日期"] || "不详",
+    region: jsonStar["地區"] || "未知",
+    domains: domains
+  };
+}
+
+/* 状态管理 */
+const DEFAULT_STATE={
+  left:{id:'left',name:'',defaultPhotoUrl:'',defaultQuote:'出手即巅峰',currentPhotoUrl:null,currentQuote:null,wins:0,candidates:[]},
+  right:{id:'right',name:'',defaultPhotoUrl:'',defaultQuote:'从不言弃',currentPhotoUrl:null,currentQuote:null,wins:0,candidates:[]},
+  cpList: popularCPs.map(cp=>({
+    id:cp.id,name:cp.name,
+    defaultPhotoUrl:posterOf(cp.name),defaultQuote:cp.type||'天作之合',
+    currentPhotoUrl:posterOf(cp.name),currentQuote:cp.type||'天作之合',
+    source:cp.source,type:cp.type,score:cp.score,wins:0,candidates:[]
+  })),
+  arena:{queue:[],ptr:0},
+  cpArena:{queue:[],ptr:0,leftId:null,rightId:null},
+  ratings:{},
+  cpRatings:Object.fromEntries(popularCPs.map(cp=>[cp.name, cp.score]))
+};
+
+function loadState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const st=JSON.parse(raw);
+      return {...DEFAULT_STATE,...st};
+    }
+  }catch{}
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+}
+
+let state = loadState();
+
+/* Elo系统 */
+const getRating=n=>state.ratings?.[n] ?? 1200;
+const setRating=(n,v)=>{state.ratings[n]=Math.round(v);};
+function eloUpdate(win,lose){
+  const Ra=getRating(win), Rb=getRating(lose);
+  const Ea=1/(1+10**((Rb-Ra)/400));
+  const Eb=1-Ea;
+  const Ra2=Ra+K_FACTOR*(1-Ea);
+  const Rb2=Rb+K_FACTOR*(0-Eb);
+  setRating(win,Ra2); setRating(lose,Rb2); saveState();
+  return {winDelta:Math.round(Ra2-Ra),loseDelta:Math.round(Rb2-Rb)};
+}
+
+/* CP Elo系统 */
+const getCPRating=n=>state.cpRatings?.[n] ?? 1200;
+const setCPRating=(n,v)=>{state.cpRatings[n]=Math.round(v);};
+function eloUpdateCP(win,lose){
+  const Ra=getCPRating(win), Rb=getCPRating(lose);
+  const Ea=1/(1+10**((Rb-Ra)/400));
+  const Eb=1-Ea;
+  const Ra2=Ra+K_FACTOR*(1-Ea);
+  const Rb2=Rb+K_FACTOR*(0-Eb);
+  setCPRating(win,Ra2); setCPRating(lose,Rb2); saveState();
+  return {winDelta:Math.round(Ra2-Ra),loseDelta:Math.round(Rb2-Rb)};
+}
+
+/* 过滤与队列 */
+function getFilteredStarQueue(){
+  const g=$('#genderFilter').value,a=$('#ageFilter').value,c=$('#categoryFilter').value;
+  return starsRaw
+    .filter(s=>g==='all'||s.gender===g)
+    .filter(s=>a==='all'||ageGroup(s.age)===a)
+    .filter(s=>c==='all'||s.category===c)
+    .sort((x,y)=>getRating(y.name)-getRating(x.name));
+}
+
+function rebuildArenaQueue(){state.arena.queue=getFilteredStarQueue();state.arena.ptr=0;saveState();}
+
+function nextChallenger(exclude=[]){
+  const q=state.arena.queue.length?state.arena.queue:getFilteredStarQueue();
+  if(!q.length) return null;
+  for(let i=0;i<q.length;i++){
+    const idx=(state.arena.ptr+i)%q.length; const cand=q[idx];
+    if(!exclude.includes(cand.name)){ state.arena.ptr=(idx+1)%q.length; saveState(); return cand; }
+  }
+  return null;
+}
+
+/* CP队列 */
+function rebuildCPQueue(){
+  state.cpArena.queue = [...state.cpList].sort((a,b)=>getCPRating(b.name)-getCPRating(a.name));
+  state.cpArena.ptr=0; saveState();
+}
+
+function nextCPChallenger(excludeIds=[]){
+  const q=state.cpArena.queue.length?state.cpArena.queue:[...state.cpList];
+  if(!q.length) return null;
+  for(let i=0;i<q.length;i++){
+    const idx=(state.cpArena.ptr+i)%q.length; const cand=q[idx];
+    if(!excludeIds.includes(cand.id)){ state.cpArena.ptr=(idx+1)%q.length; saveState(); return cand; }
+  }
+  return null;
+}
+
+/* 渲染卡片 */
+function setCard(side,data,starData=null){
+  const p=$(`#arena${cap(side)}Photo`), n=$(`#arena${cap(side)}Name`), 
+        i=$(`#arena${cap(side)}Info`), q=$(`#arena${cap(side)}Quote`), 
+        w= side==='left' ? $('#leftWins') : $('#rightWins');
+  
+  if(p) p.style.backgroundImage=`url('${data.currentPhotoUrl||data.defaultPhotoUrl}')`;
+  if(n) n.textContent=data.name||'';
+  
+  if(i && starData) {
+    const info = [];
+    if(starData.region && starData.region !== "未知") info.push(starData.region);
+    if(starData.birthDate && starData.birthDate !== "不详") info.push(starData.birthDate.slice(0,4)+"年");
+    if(starData.domains && starData.domains.length) info.push(starData.domains.slice(0,2).join("·"));
+    i.textContent = info.join(" | ");
+  }
+  
+  if(q){ 
+    q.textContent=data.currentQuote||data.defaultQuote||''; 
+    q.onclick=(ev)=>{
+      ev.stopPropagation();
+      const val=prompt('输入一句话简介（中文≤10字）：', data.currentQuote||data.defaultQuote||''); 
+      if(val==null) return; 
+      const clean=val.replace(/\s+/g,''); 
+      if([...clean].length>10||!clean){
+        alert('不超过10个中文字符');return;
+      } 
+      const cand={id:uid(),type:'quote',data:clean,votes:0,createdAt:now(),entity:'star',side}; 
+      data.candidates.unshift(cand); 
+      saveState();
+    };
+  }
+  
+  if(w) w.textContent=`连胜: ${data.wins||0}场`;
+  
+  const photoBtn = document.getElementById(side==='left'?'leftPhotoPost':'rightPhotoPost');
+  const quoteBtn = document.getElementById(side==='left'?'leftQuotePost':'rightQuotePost');
+  if(photoBtn) photoBtn.href = `submissions.html?entity=star&side=${side}&type=photo`;
+  if(quoteBtn) quoteBtn.href = `submissions.html?entity=star&side=${side}&type=quote`;
+}
+
+function setCPCard(side, cpObj){
+  const p=$(`#cp${cap(side)}Photo`), n=$(`#cp${cap(side)}Name`), q=$(`#cp${cap(side)}Quote`), w=$(`#cp${cap(side)}Wins`);
+  if(p) p.style.backgroundImage=`url('${cpObj.currentPhotoUrl||cpObj.defaultPhotoUrl}')`;
+  if(n) n.textContent=cpObj.name||'';
+  if(q) q.textContent=cpObj.currentQuote||cpObj.type||'—';
+  if(w) w.textContent=`连胜: ${cpObj.wins||0}场`;
+  const photoBtn = document.getElementById(side==='left'?'cpLeftPhotoPost':'cpRightPhotoPost');
+  const quoteBtn = document.getElementById(side==='left'?'cpLeftQuotePost':'cpRightQuotePost');
+  if(photoBtn) photoBtn.href = `submissions.html?entity=cp&cpId=${encodeURIComponent(cpObj.id)}&type=photo`;
+  if(quoteBtn) quoteBtn.href = `submissions.html?entity=cp&cpId=${encodeURIComponent(cpObj.id)}&type=quote`;
+}
+
+/* 载入明星到位置 */
+function loadStarIntoSide(side, starObj){
+  const slot=state[side];
+  slot.name=starObj.name;
+  slot.defaultPhotoUrl=posterOf(starObj.name);
+  if

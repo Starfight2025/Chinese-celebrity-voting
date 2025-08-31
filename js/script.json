@@ -1,0 +1,107 @@
+const files = [
+  "data/stars_part_1_zh_normalized.json",
+  "data/stars_part_2_zh_normalized.json",
+  "data/stars_part_3_zh_normalized.json",
+  "data/stars_part_4_zh_normalized.json",
+  "data/stars_part_5_zh_normalized.json"
+];
+
+let allStars = [];
+let filteredStars = [];
+
+Promise.all(files.map(file => fetch(file).then(res => res.json())))
+  .then(jsonArrays => {
+    allStars = jsonArrays.flat();
+    filteredStars = allStars;
+    initFilters(); // 初始化下拉選單
+    renderStars(filteredStars);
+  })
+  .catch(err => {
+    console.error("載入資料時出錯：", err);
+  });
+
+function renderStars(stars) {
+  const container = document.getElementById("star-list");
+  container.innerHTML = "";
+
+  if (stars.length === 0) {
+    container.innerHTML = "<p>找不到符合條件的明星。</p>";
+    return;
+  }
+
+  stars.forEach(star => {
+    const card = document.createElement("div");
+    card.className = "star-card";
+    card.innerHTML = `
+      <h3>${star["姓名"]}</h3>
+      <p>性別：${star["性別"] || "未知"}</p>
+      <p>出生日期：${star["出生日期"] || "不詳"}</p>
+      <p>分類：${star["分類"] || "無"}</p>
+      <p>地區：${star["地區"] || "無"}</p>
+      <p>領域：${(star["職業"] || []).join("，")}</p>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function initFilters() {
+  // 性別選單
+  const genderSelect = document.getElementById("gender-filter");
+  ["全部", "男", "女"].forEach(g => {
+    const opt = document.createElement("option");
+    opt.value = g;
+    opt.textContent = g;
+    genderSelect.appendChild(opt);
+  });
+
+  // 年齡段選單
+  const ageSelect = document.getElementById("age-filter");
+  ["全部", "00後", "90後", "80後", "70後", "60後", "未知"].forEach(a => {
+    const opt = document.createElement("option");
+    opt.value = a;
+    opt.textContent = a;
+    ageSelect.appendChild(opt);
+  });
+
+  // 領域選單（從原職業欄中抽取）
+  const domainSelect = document.getElementById("domain-filter");
+  ["全部", "演員", "音樂人"].forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    domainSelect.appendChild(opt);
+  });
+
+  // 綁定篩選事件
+  [genderSelect, ageSelect, domainSelect].forEach(select => {
+    select.addEventListener("change", applyFilters);
+  });
+}
+
+function getAgeGroup(birthdayStr) {
+  if (!birthdayStr || birthdayStr === "不詳") return "未知";
+  const year = parseInt(birthdayStr.slice(0, 4));
+  if (isNaN(year)) return "未知";
+
+  if (year >= 2000) return "00後";
+  if (year >= 1990) return "90後";
+  if (year >= 1980) return "80後";
+  if (year >= 1970) return "70後";
+  if (year >= 1960) return "60後";
+  return "未知";
+}
+
+function applyFilters() {
+  const gender = document.getElementById("gender-filter").value;
+  const ageGroup = document.getElementById("age-filter").value;
+  const domain = document.getElementById("domain-filter").value;
+
+  filteredStars = allStars.filter(star => {
+    const matchGender = gender === "全部" || star["性別"] === gender;
+    const matchAge = ageGroup === "全部" || getAgeGroup(star["出生日期"]) === ageGroup;
+    const matchDomain = domain === "全部" || (star["職業"] || []).includes(domain);
+    return matchGender && matchAge && matchDomain;
+  });
+
+  renderStars(filteredStars);
+}
